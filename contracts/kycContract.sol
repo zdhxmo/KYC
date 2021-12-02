@@ -21,10 +21,26 @@ contract kycContract {
     mapping(address => Bank) banks;
 
     // function to view customer
-    function viewCustomer(string memory customerName)
+    function viewCustomer(string memory _customerName)
         public
-        returns (string memory)
-    {}
+        view
+        returns (
+            string memory,
+            string memory,
+            address
+        )
+    {
+        require(
+            customers[_customerName].validatorBankAddress == address(0),
+            "User doesn't exist on this database"
+        );
+
+        return (
+            customers[_customerName].username,
+            customers[_customerName].customerData,
+            customers[_customerName].validatorBankAddress
+        );
+    }
 
     // function to add customers mapped to their documents
     function addCustomer(
@@ -46,5 +62,4 @@ contract kycContract {
         string memory customerName,
         string memory newDataHash
     ) public returns (uint256) {}
-
 }
