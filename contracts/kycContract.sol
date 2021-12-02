@@ -59,7 +59,14 @@ contract kycContract {
 
     // function to edit customer details
     function modifyCustomer(
-        string memory customerName,
-        string memory newDataHash
-    ) public returns (uint256) {}
+        string memory _customerName,
+        string memory _newCustomerData
+    ) public {
+        require(
+            customers[_customerName].validatorBankAddress == address(0),
+            "User doesn't exist. Please call addCustomer to create new user"
+        );
+
+        customers[_customerName].customerData = _newCustomerData;
+    }
 }
