@@ -1,6 +1,8 @@
+// SPDX-License-Identifier: MIT
+
 pragma solidity ^0.8.9;
 
-contract kycContract {
+contract KYC_Contract {
     struct Customer {
         string username;
         // hash that points to customer documents in secure storage
@@ -29,6 +31,10 @@ contract kycContract {
         string regNumber;
     }
 
+    // count of total banks in the network
+    uint256 totalBanks;
+
+
     struct KYC_Request {
         // map KYC request to customer data
         string username;
@@ -38,10 +44,45 @@ contract kycContract {
         address bankAddress;
     }
 
+    // customer name to view customer details
     mapping(string => Customer) customers;
+
+    // unique bank address to view bank details
     mapping(address => Bank) banks;
 
-    // function to view customer
+    // customer document hash to view kyc requests
+    mapping(string => KYC_Request) KYCrequests;
+
+    /*
+     * Record a new KYC request on behalf of a customer
+     * Bank is the sender of this request
+     * @param {string}   _customerName The name of the customer for whom KYC is to be done
+     * @param {string}  _customerData The hash of the customer data being requested
+     */
+    function addKYCRequest(
+        string memory _customerName,
+        string memory _customerData
+    ) public {
+        // require that the request the bank is making isn't a duplicate
+        require(
+            !(KYCrequests[_customerName].bankAddress == msg.sender),
+            "A KYC request already exists for this user from this bank"
+        );
+
+        // update KYC requests mapping
+        KYCrequests[_customerName].username = _customerName;
+        KYCrequests[_customerName].customerData = _customerData;
+        KYCrequests[_customerName].bankAddress = msg.sender;
+
+        // add KYC requests made by this bank
+        banks[msg.sender].KYC_count++;
+    }
+
+    /*
+     * View customer information
+     * @param  {public}  _customerName Name of the customer
+     * @return {Customer} The customer struct as an object
+     */
     function viewCustomer(string memory _customerName)
         public
         view
@@ -63,7 +104,11 @@ contract kycContract {
         );
     }
 
-    // function to add customers mapped to their documents
+    /*
+     * Add a new customer
+     * @param {string} _userName Name of the customer
+     * @param {string} _customerData Hash of the customer docs
+     */
     function addCustomer(
         string memory _customerName,
         string memory _customerData
@@ -78,7 +123,11 @@ contract kycContract {
         customers[_customerName].validatorBankAddress = msg.sender;
     }
 
-    // function to edit customer details
+    /*
+     * Modify customer data
+     * @param  {string} _customerName Name of the customer
+     * @param  {string} _newCustomerData New hash of the updated docs
+     */
     function modifyCustomer(
         string memory _customerName,
         string memory _newCustomerData
