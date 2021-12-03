@@ -3,8 +3,14 @@ pragma solidity ^0.8.9;
 contract kycContract {
     struct Customer {
         string username;
-        // hash of the documents submitted by the customer
+        // hash that points to customer documents in secure storage
         string customerData;
+        // status of KYC request. if conditions are met, set to true. else false
+        bool kycRequest;
+        // number of upvotes from other banks to customer data
+        uint256 upVotes;
+        // number of downvotes from other banks to customer data
+        uint256 downVotes;
         // unique address of the validating bank
         address validatorBankAddress;
     }
@@ -13,8 +19,23 @@ contract kycContract {
         string name;
         // unique ethereum address of the bank
         address ethAddress;
+        // total complaints against the bank by other banks in the network
+        uint256 complaintsReported;
+        //number of KYC requests initiated by bank
+        uint256 KYC_count;
+        // status. if false, bank cannot up/down vote any more customers
+        bool isAllowedToVote;
         // registration number of the bank
         string regNumber;
+    }
+
+    struct KYC_Request {
+        // map KYC request to customer data
+        string username;
+        // hash that points to customer documents in secure storage
+        string customerData;
+        // unique account address of the bank
+        address bankAddress;
     }
 
     mapping(string => Customer) customers;
