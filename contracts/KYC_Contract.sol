@@ -295,7 +295,9 @@ contract KYC_Contract {
         uint32 condition1 = customers[_customerName].downVotes * 100;
         uint32 condition2 = 33 * totalBanks;
 
+        // if total down votes is lesser than a third of the total banks in the network
         if (condition1 < condition2) {
+            // if upvotes is greater than down votes
             if (
                 customers[_customerName].upVotes >
                 customers[_customerName].downVotes
@@ -304,6 +306,8 @@ contract KYC_Contract {
             } else {
                 customers[_customerName].kycStatus = false;
             }
+        } else {
+            customers[_customerName].kycStatus = false;
         }
 
         emit CustomerKYCStatus(
