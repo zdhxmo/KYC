@@ -45,9 +45,6 @@ contract KYC_Contract {
         string regNumber;
     }
 
-    // count of total banks in the network
-    uint32 totalBanks;
-
     struct KYC_Request {
         // map KYC request to customer data
         string username;
@@ -56,6 +53,9 @@ contract KYC_Contract {
         // unique account address of the bank
         address bankAddress;
     }
+
+    // count of total banks in the network
+    uint32 totalBanks;
 
     /* Mappings */
 
@@ -109,7 +109,11 @@ contract KYC_Contract {
     event DownVoteCustomer(string _customerName, address bankAddress);
     event RemoveDownVoteCustomer(string _customerName, address bankAddress);
 
-    event ReportBank(address _bankAddress, address reportingBank);
+    event ReportBank(
+        address _bankAddress,
+        address reportingBank,
+        bool isAllowedToVote
+    );
 
     event AddBank(
         string _bankName,
@@ -117,6 +121,12 @@ contract KYC_Contract {
         string _bankRegistration,
         uint32 _complaintsReported,
         bool _KYCPermission
+    );
+
+    event ModifyIfBankAllowedToVote(
+        address _bankAddress,
+        bool _isAllowedToVote,
+        address _revokingBank
     );
 
     /**
@@ -428,9 +438,19 @@ contract KYC_Contract {
         // update count of the complaints reported
         banks[_bankAddress].complaintsReported++;
 
-        // TODO: update isAllowedToVote status
+        // solidity doesn't support float or rational numbers
+        // hence we multiply 100 to both sides of the equation
+        uint32 condition1 = banks[_bankAddress].complaintsReported * 100;
+        uint32 condition2 = 33 * totalBanks;
+        if (condition1 > condition2) {
+            banks[_bankAddress].isAllowedToVote = false;
+        }
 
-        emit ReportBank(_bankAddress, msg.sender);
+        emit ReportBank(
+            _bankAddress,
+            msg.sender,
+            banks[_bankAddress].isAllowedToVote
+        );
         return true;
     }
 
@@ -490,11 +510,38 @@ contract KYC_Contract {
         // update registration number and name mappings
         bank_registration_numbers[_bankRegistration] = true;
         added_banks[_bankAddress] = true;
+        bank_names[_bankName] = true;
 
         // update count of total banks in the network
         totalBanks++;
 
         emit AddBank(_bankName, _bankAddress, _bankRegistration, 0, true);
+        return true;
+    }
+
+    /**
+     * Modify if a bank is allowed to vote in the KYC process
+     * @param _bankAddress unique address of the bank
+     * @param _isAllowedToVote boolean value, true if bank is allowed, false if not
+     * @return bool true if bank's voting rights were revoked by admin
+     */
+
+    function modifyIfBankAllowedToVote(
+        address _bankAddress,
+        bool _isAllowedToVote
+    ) public onlyAdmin returns (bool) {
+        require(
+            banks[_bankAddress].ethAddress == _bankAddress,
+            "Bank address is incorrect. No such record exists"
+        );
+
+        banks[_bankAddress].isAllowedToVote = _isAllowedToVote;
+
+        emit ModifyIfBankAllowedToVote(
+            _bankAddress,
+            _isAllowedToVote,
+            msg.sender
+        );
         return true;
     }
 
