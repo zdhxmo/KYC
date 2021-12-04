@@ -100,12 +100,18 @@ contract KYC_Contract {
     event DownVoteCustomer(string _customerName, address bankAddress);
     event RemoveDownVoteCustomer(string _customerName, address bankAddress);
 
+    event ReportBank(
+        address _bankAddress,
+        string bankName,
+        address reportingBank
+    );
+
     /**
      * Record a new KYC request on behalf of a customer
      * Bank is the sender of this request
      * @param _customerName The name of the customer for whom KYC is to be done
      * @param _customerData The hash of the customer data being requested
-     * @return bool
+     * @return bool confirmation that KYC request was added
      */
     function addKYCRequest(
         string memory _customerName,
@@ -140,7 +146,7 @@ contract KYC_Contract {
     /**
      * Remove KYC request
      * @param _customerName The name of the customer for whom KYC is to be removed
-     * @return bool
+     * @return bool confirmation that KYC request was removed
      */
     function removeKYCRequest(string memory _customerName)
         public
@@ -205,7 +211,7 @@ contract KYC_Contract {
      * Add a new customer
      * @param _customerName Name of the customer
      * @param _customerData Hash of the customer docs
-     * @return bool
+     * @return bool confirmation that user was added
      */
     function addCustomer(
         string memory _customerName,
@@ -228,7 +234,7 @@ contract KYC_Contract {
      * Modify customer data
      * @param _customerName Name of the customer
      * @param _newCustomerData New hash of the updated docs
-     * @return bool
+     * @return bool confirmation that user was modified
      */
     function modifyCustomer(
         string memory _customerName,
@@ -249,7 +255,7 @@ contract KYC_Contract {
     /**
      * Function to add a new up vote for a customer
      * @param _customerName Name of the customer to be upvoted
-     * @return bool
+     * @return bool confirmation that up votes were updated
      */
     function upVoteCustomer(string memory _customerName) public returns (bool) {
         require(
@@ -276,7 +282,7 @@ contract KYC_Contract {
     /**
      * Function to remove an up vote for a customer
      * @param _customerName Name of the customer to be upvoted
-     * @return bool
+     * @return bool confirmation that up votes were updated
      */
     function removeUpVoteCustomer(string memory _customerName)
         public
@@ -306,7 +312,7 @@ contract KYC_Contract {
     /**
      * Function to add a new down vote for a customer
      * @param _customerName Name of the customer to be upvoted
-     * @return bool
+     * @return bool confirmation that down votes were updated
      */
     function downVoteCustomer(string memory _customerName)
         public
@@ -336,7 +342,7 @@ contract KYC_Contract {
     /**
      * Function to remove a down vote for a customer
      * @param _customerName Name of the customer to be upvoted
-     * @return bool
+     * @return bool confirmation that down votes were updated
      */
     function removeDownVoteCustomer(string memory _customerName)
         public
@@ -361,24 +367,6 @@ contract KYC_Contract {
 
         emit RemoveDownVoteCustomer(_customerName, msg.sender);
         return true;
-    }
-
-    /**
-     * View total number of bank complaints
-     * @param _bankAddress unique address of the bank
-     * @return uint32 total number of bank complaints
-     */
-    function getBankComplaints(address _bankAddress)
-        public
-        view
-        returns (uint32)
-    {
-        require(
-            banks[_bankAddress].ethAddress == _bankAddress,
-            "Bank address is incorrect. No such record exists"
-        );
-
-        return banks[_bankAddress].complaintsReported;
     }
 
     /**
@@ -413,7 +401,47 @@ contract KYC_Contract {
         );
     }
 
-    
+    /**
+     * Report a complaint against a bank
+     * @param _bankAddress Unique address of the bank
+     * @param _bankName Name of the bank
+     * @return bool confirmation that report was submitted
+     */
+    function reportBank(address _bankAddress, string memory _bankName)
+        public
+        returns (bool)
+    {
+        require(
+            banks[_bankAddress].ethAddress == _bankAddress,
+            "Bank address is incorrect. No such record exists"
+        );
+
+        // update count of the complaints reported
+        banks[_bankAddress].complaintsReported++;
+
+        // TODO: update isAllowedToVote status
+
+        emit ReportBank(_bankAddress, _bankName, msg.sender);
+        return true;
+    }
+
+    /**
+     * View total number of bank complaints
+     * @param _bankAddress unique address of the bank
+     * @return uint32 total number of bank complaints
+     */
+    function getBankComplaints(address _bankAddress)
+        public
+        view
+        returns (uint32)
+    {
+        require(
+            banks[_bankAddress].ethAddress == _bankAddress,
+            "Bank address is incorrect. No such record exists"
+        );
+
+        return banks[_bankAddress].complaintsReported;
+    }
 
     // source: https://ethereum.stackexchange.com/questions/45813/compare-strings-in-solidity
     function compareStringsbyBytes(string memory s1, string memory s2)
