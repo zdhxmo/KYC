@@ -74,6 +74,15 @@ contract KYC_Contract {
     // keep track of down votes for the customer by all the banks in the network
     mapping(string => mapping(address => uint8)) down_votes;
 
+    // make sure all bank registration numbers are unique
+    mapping(string => bool) bank_registration_numbers;
+
+    // keep track of banks added to the network
+    mapping(address => bool) added_banks;
+
+    // keep track of bank names added to the system
+    mapping(string => bool) bank_names;
+
     /* Events */
 
     event AddKYCRequest(
@@ -100,10 +109,14 @@ contract KYC_Contract {
     event DownVoteCustomer(string _customerName, address bankAddress);
     event RemoveDownVoteCustomer(string _customerName, address bankAddress);
 
-    event ReportBank(
+    event ReportBank(address _bankAddress, address reportingBank);
+
+    event AddBank(
+        string _bankName,
         address _bankAddress,
-        string bankName,
-        address reportingBank
+        string _bankRegistration,
+        uint32 _complaintsReported,
+        bool _KYCPermission
     );
 
     /**
@@ -404,13 +417,9 @@ contract KYC_Contract {
     /**
      * Report a complaint against a bank
      * @param _bankAddress Unique address of the bank
-     * @param _bankName Name of the bank
      * @return bool confirmation that report was submitted
      */
-    function reportBank(address _bankAddress, string memory _bankName)
-        public
-        returns (bool)
-    {
+    function reportBank(address _bankAddress) public returns (bool) {
         require(
             banks[_bankAddress].ethAddress == _bankAddress,
             "Bank address is incorrect. No such record exists"
@@ -421,7 +430,7 @@ contract KYC_Contract {
 
         // TODO: update isAllowedToVote status
 
-        emit ReportBank(_bankAddress, _bankName, msg.sender);
+        emit ReportBank(_bankAddress, msg.sender);
         return true;
     }
 
@@ -441,6 +450,52 @@ contract KYC_Contract {
         );
 
         return banks[_bankAddress].complaintsReported;
+    }
+
+    /**
+     * Add a new bank to the network
+     * @param _bankName name of the bank
+     * @param _bankAddress unique address of the bank
+     * @param _bankRegistration unique registration number of the bank
+     * @return bool New bank has been added to the network
+     */
+    function addBank(
+        string memory _bankName,
+        address _bankAddress,
+        string memory _bankRegistration
+    ) public onlyAdmin returns (bool) {
+        require(
+            added_banks[_bankAddress] == false,
+            "This bank has already been added"
+        );
+
+        // require a unique registration number
+        require(
+            bank_registration_numbers[_bankRegistration] == false,
+            "This registration number has been taken. Please enter another one."
+        );
+
+        require(
+            bank_names[_bankName] == false,
+            "A bank of this name already exists in the network"
+        );
+
+        banks[_bankAddress].name = _bankName;
+        banks[_bankAddress].ethAddress = _bankAddress;
+        banks[_bankAddress].complaintsReported = 0;
+        banks[_bankAddress].KYC_count = 0;
+        banks[_bankAddress].isAllowedToVote = true;
+        banks[_bankAddress].regNumber = _bankRegistration;
+
+        // update registration number and name mappings
+        bank_registration_numbers[_bankRegistration] = true;
+        added_banks[_bankAddress] = true;
+
+        // update count of total banks in the network
+        totalBanks++;
+
+        emit AddBank(_bankName, _bankAddress, _bankRegistration, 0, true);
+        return true;
     }
 
     // source: https://ethereum.stackexchange.com/questions/45813/compare-strings-in-solidity
