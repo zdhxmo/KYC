@@ -173,7 +173,7 @@ contract KYC_Contract {
     /**
      * View customer information
      * @param _customerName Name of the customer
-     * @return struct Customer - The customer struct as an object
+     * @return struct Customer
      */
     function viewCustomer(string memory _customerName)
         public
@@ -380,6 +380,40 @@ contract KYC_Contract {
 
         return banks[_bankAddress].complaintsReported;
     }
+
+    /**
+     * View bank information
+     * @param _bankAddress Unique address of the bank
+     * @return struct Bank
+     */
+    function getBankDetails(address _bankAddress)
+        public
+        view
+        returns (
+            string memory,
+            address,
+            uint32,
+            uint32,
+            bool,
+            string memory
+        )
+    {
+        require(
+            banks[_bankAddress].ethAddress == _bankAddress,
+            "Bank address is incorrect. No such record exists"
+        );
+
+        return (
+            banks[_bankAddress].name,
+            banks[_bankAddress].ethAddress,
+            banks[_bankAddress].complaintsReported,
+            banks[_bankAddress].KYC_count,
+            banks[_bankAddress].isAllowedToVote,
+            banks[_bankAddress].regNumber
+        );
+    }
+
+    
 
     // source: https://ethereum.stackexchange.com/questions/45813/compare-strings-in-solidity
     function compareStringsbyBytes(string memory s1, string memory s2)
