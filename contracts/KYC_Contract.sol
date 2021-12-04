@@ -22,7 +22,7 @@ contract KYC_Contract {
         // hash that points to customer documents in secure storage
         string customerData;
         // status of KYC request. if conditions are met, set to true. else false
-        bool kycRequest;
+        bool kycStatus;
         // number of upvotes from other banks to customer data
         uint32 upVotes;
         // number of downvotes from other banks to customer data
@@ -103,6 +103,8 @@ contract KYC_Contract {
         address bankAddress
     );
 
+    event CustomerKYCStatus(string _customerName, bool _KYCStatus);
+
     event UpVoteCustomer(string _customerName, address bankAddress);
     event RemoveUpVoteCustomer(string _customerName, address bankAddress);
 
@@ -125,9 +127,10 @@ contract KYC_Contract {
 
     event ModifyIfBankAllowedToVote(
         address _bankAddress,
-        bool _isAllowedToVote,
-        address _revokingBank
+        bool _isAllowedToVote
     );
+
+    event RemoveBank(address _bankAddress);
 
     /**
      * Record a new KYC request on behalf of a customer
@@ -249,6 +252,9 @@ contract KYC_Contract {
         customers[_customerName].customerData = _customerData;
         customers[_customerName].validatorBankAddress = msg.sender;
 
+        // initiate KYC request on creation of customer
+        addKYCRequest(_customerName, _customerData);
+
         emit AddCustomer(_customerName, _customerData, msg.sender);
         return true;
     }
@@ -276,6 +282,38 @@ contract KYC_Contract {
     }
 
     /**
+     * Function to change the KYC status of customer based on up or down votes
+     * @param _customerName Name of the customer to be upvoted
+     * @return bool true if KYC status was updated
+     */
+    function customerKYCStatus(string memory _customerName)
+        public
+        returns (bool)
+    {
+        // solidity doesn't support float or rational numbers
+        // hence we multiply 100 to both sides of the equation
+        uint32 condition1 = customers[_customerName].downVotes * 100;
+        uint32 condition2 = 33 * totalBanks;
+
+        if (condition1 < condition2) {
+            if (
+                customers[_customerName].upVotes >
+                customers[_customerName].downVotes
+            ) {
+                customers[_customerName].kycStatus = true;
+            } else {
+                customers[_customerName].kycStatus = false;
+            }
+        }
+
+        emit CustomerKYCStatus(
+            _customerName,
+            customers[_customerName].kycStatus
+        );
+        return true;
+    }
+
+    /**
      * Function to add a new up vote for a customer
      * @param _customerName Name of the customer to be upvoted
      * @return bool confirmation that up votes were updated
@@ -290,6 +328,14 @@ contract KYC_Contract {
         );
 
         require(
+            compareStringsbyBytes(
+                KYC_requests[_customerName].username,
+                _customerName
+            ),
+            "Cannot upvote as no KYC exists for this customer yet."
+        );
+
+        require(
             up_votes[_customerName][msg.sender] == 0,
             "Customer has already been upvoted by you."
         );
@@ -297,6 +343,9 @@ contract KYC_Contract {
         // update upVote count
         customers[_customerName].upVotes++;
         up_votes[_customerName][msg.sender] = 1;
+
+        // update customer KYC status in light of vote update
+        customerKYCStatus(_customerName);
 
         emit UpVoteCustomer(_customerName, msg.sender);
         return true;
@@ -320,6 +369,14 @@ contract KYC_Contract {
         );
 
         require(
+            compareStringsbyBytes(
+                KYC_requests[_customerName].username,
+                _customerName
+            ),
+            "Cannot remove upvote as no KYC exists for this customer yet."
+        );
+
+        require(
             up_votes[_customerName][msg.sender] == 1,
             "Customer hasn't been upvoted by you. use upVoteCustomer"
         );
@@ -327,6 +384,9 @@ contract KYC_Contract {
         // update upVote count
         customers[_customerName].upVotes--;
         up_votes[_customerName][msg.sender] = 0;
+
+        // update customer KYC status in light of vote update
+        customerKYCStatus(_customerName);
 
         emit RemoveUpVoteCustomer(_customerName, msg.sender);
         return true;
@@ -350,6 +410,14 @@ contract KYC_Contract {
         );
 
         require(
+            compareStringsbyBytes(
+                KYC_requests[_customerName].username,
+                _customerName
+            ),
+            "Cannot downvote as no KYC exists for this customer yet."
+        );
+
+        require(
             down_votes[_customerName][msg.sender] == 0,
             "Customer has already been down voted by you."
         );
@@ -357,6 +425,9 @@ contract KYC_Contract {
         // update downVote count
         customers[_customerName].downVotes++;
         down_votes[_customerName][msg.sender] = 1;
+
+        // update customer KYC status in light of vote update
+        customerKYCStatus(_customerName);
 
         emit DownVoteCustomer(_customerName, msg.sender);
         return true;
@@ -380,6 +451,14 @@ contract KYC_Contract {
         );
 
         require(
+            compareStringsbyBytes(
+                KYC_requests[_customerName].username,
+                _customerName
+            ),
+            "Cannot remove downvote as no KYC exists for this customer yet."
+        );
+
+        require(
             down_votes[_customerName][msg.sender] == 1,
             "Customer hasn't been down voted by you. Use downVoteCustomer."
         );
@@ -387,6 +466,9 @@ contract KYC_Contract {
         // update downVote count
         customers[_customerName].downVotes--;
         down_votes[_customerName][msg.sender] = 0;
+
+        // update customer KYC status in light of vote update
+        customerKYCStatus(_customerName);
 
         emit RemoveDownVoteCustomer(_customerName, msg.sender);
         return true;
@@ -537,11 +619,24 @@ contract KYC_Contract {
 
         banks[_bankAddress].isAllowedToVote = _isAllowedToVote;
 
-        emit ModifyIfBankAllowedToVote(
-            _bankAddress,
-            _isAllowedToVote,
-            msg.sender
+        emit ModifyIfBankAllowedToVote(_bankAddress, _isAllowedToVote);
+        return true;
+    }
+
+    /**
+     * Remove a bank from the network
+     * @param _bankAddress unique address of the bank
+     * @return bool true if bank has been removed from the network by admin
+     */
+    function removeBank(address _bankAddress) public onlyAdmin returns (bool) {
+        require(
+            banks[_bankAddress].ethAddress == _bankAddress,
+            "Bank address is incorrect. No such record exists"
         );
+
+        delete banks[_bankAddress];
+
+        emit RemoveBank(_bankAddress);
         return true;
     }
 
