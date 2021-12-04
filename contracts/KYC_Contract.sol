@@ -68,10 +68,10 @@ contract KYC_Contract {
     // customer name to view KYC requests
     mapping(string => KYC_Request) KYC_requests;
 
-    // keep track of up votes for the customer by all banks in the network
+    // keep track of up votes for the customer by all the banks in the network
     mapping(string => mapping(address => uint8)) up_votes;
 
-    // keep track of down votes for the customer by all banks in the network
+    // keep track of down votes for the customer by all the banks in the network
     mapping(string => mapping(address => uint8)) down_votes;
 
     /* Events */
@@ -181,7 +181,9 @@ contract KYC_Contract {
         returns (
             string memory,
             string memory,
-            address
+            address,
+            uint32,
+            uint32
         )
     {
         require(
@@ -193,7 +195,9 @@ contract KYC_Contract {
         return (
             customers[_customerName].username,
             customers[_customerName].customerData,
-            customers[_customerName].validatorBankAddress
+            customers[_customerName].validatorBankAddress,
+            customers[_customerName].upVotes,
+            customers[_customerName].downVotes
         );
     }
 
@@ -357,6 +361,24 @@ contract KYC_Contract {
 
         emit RemoveDownVoteCustomer(_customerName, msg.sender);
         return true;
+    }
+
+    /**
+     * View total number of bank complaints
+     * @param _bankAddress unique address of the bank
+     * @return uint32 total number of bank complaints
+     */
+    function getBankComplaints(address _bankAddress)
+        public
+        view
+        returns (uint32)
+    {
+        require(
+            banks[_bankAddress].ethAddress == _bankAddress,
+            "Bank address is incorrect. No such record exists"
+        );
+
+        return banks[_bankAddress].complaintsReported;
     }
 
     // source: https://ethereum.stackexchange.com/questions/45813/compare-strings-in-solidity
