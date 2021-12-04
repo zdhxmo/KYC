@@ -76,12 +76,29 @@ contract KYC_Contract {
 
     /* Events */
 
-    event AddKYCRequest(string _customerName, string _customerData);
-    event RemoveKYCRequest(string _customerName);
-    event AddCustomer(string _customerName, string _customerData);
-    event ModifyCustomer(string _customerName, string _newCustomerData);
-    event UpVoteCustomer(string _customerName);
-    event DownVoteCustomer(string _customerName);
+    event AddKYCRequest(
+        string _customerName,
+        string _customerData,
+        address KYCRequestingBank
+    );
+    event RemoveKYCRequest(string _customerName, address KYCRemovingBank);
+
+    event AddCustomer(
+        string _customerName,
+        string _customerData,
+        address validatorBank
+    );
+    event ModifyCustomer(
+        string _customerName,
+        string _newCustomerData,
+        address bankAddress
+    );
+
+    event UpVoteCustomer(string _customerName, address bankAddress);
+    event RemoveUpVoteCustomer(string _customerName, address bankAddress);
+
+    event DownVoteCustomer(string _customerName, address bankAddress);
+    event RemoveDownVoteCustomer(string _customerName, address bankAddress);
 
     /**
      * Record a new KYC request on behalf of a customer
@@ -100,6 +117,14 @@ contract KYC_Contract {
             "A KYC request already exists for this user from this bank"
         );
 
+        require(
+            compareStringsbyBytes(
+                customers[_customerName].customerData,
+                _customerData
+            ),
+            "Please check hash. This record doesn't exist"
+        );
+
         // update KYC requests mapping
         KYC_requests[_customerName].username = _customerName;
         KYC_requests[_customerName].customerData = _customerData;
@@ -108,7 +133,7 @@ contract KYC_Contract {
         // add KYC requests made by this bank
         banks[msg.sender].KYC_count++;
 
-        emit AddKYCRequest(_customerName, _customerData);
+        emit AddKYCRequest(_customerName, _customerData, msg.sender);
         return true;
     }
 
@@ -123,8 +148,16 @@ contract KYC_Contract {
     {
         // require that the username in fact exists as a KYC request
         require(
-            !(KYC_requests[_customerName].bankAddress == msg.sender),
+            (KYC_requests[_customerName].bankAddress == msg.sender),
             "No KYC request exists for this customer. Please use addKYCRequest function"
+        );
+
+        require(
+            compareStringsbyBytes(
+                customers[_customerName].username,
+                _customerName
+            ),
+            "No request exists for this customer. Please use addKYCRequest function"
         );
 
         // delete the customer's KYC request
@@ -133,7 +166,7 @@ contract KYC_Contract {
         // reduce KYC requests made by this bank
         banks[msg.sender].KYC_count--;
 
-        emit RemoveKYCRequest(_customerName);
+        emit RemoveKYCRequest(_customerName, msg.sender);
         return true;
     }
 
@@ -152,8 +185,9 @@ contract KYC_Contract {
         )
     {
         require(
-            customers[_customerName].validatorBankAddress == address(0),
-            "User doesn't exist on this database"
+            customers[_customerName].validatorBankAddress ==
+                address(msg.sender),
+            "User doesn't exist on this database. Use addCustomer to create user"
         );
 
         return (
@@ -174,7 +208,7 @@ contract KYC_Contract {
         string memory _customerData
     ) public returns (bool) {
         require(
-            customers[_customerName].validatorBankAddress == address(0),
+            customers[_customerName].validatorBankAddress == address(0x0),
             "User exists. Please call modifyCustomer to make any changes"
         );
 
@@ -182,7 +216,7 @@ contract KYC_Contract {
         customers[_customerName].customerData = _customerData;
         customers[_customerName].validatorBankAddress = msg.sender;
 
-        emit AddCustomer(_customerName, _customerData);
+        emit AddCustomer(_customerName, _customerData, msg.sender);
         return true;
     }
 
@@ -197,13 +231,14 @@ contract KYC_Contract {
         string memory _newCustomerData
     ) public returns (bool) {
         require(
-            customers[_customerName].validatorBankAddress == address(0),
+            customers[_customerName].validatorBankAddress ==
+                address(msg.sender),
             "User doesn't exist. Please call addCustomer to create new user"
         );
 
         customers[_customerName].customerData = _newCustomerData;
 
-        emit ModifyCustomer(_customerName, _newCustomerData);
+        emit ModifyCustomer(_customerName, _newCustomerData, msg.sender);
         return true;
     }
 
@@ -222,7 +257,7 @@ contract KYC_Contract {
         );
 
         require(
-            up_votes[_customerName][msg.sender] != 0,
+            up_votes[_customerName][msg.sender] == 0,
             "Customer has already been upvoted by you."
         );
 
@@ -230,7 +265,37 @@ contract KYC_Contract {
         customers[_customerName].upVotes++;
         up_votes[_customerName][msg.sender] = 1;
 
-        emit UpVoteCustomer(_customerName);
+        emit UpVoteCustomer(_customerName, msg.sender);
+        return true;
+    }
+
+    /**
+     * Function to remove an up vote for a customer
+     * @param _customerName Name of the customer to be upvoted
+     * @return bool
+     */
+    function removeUpVoteCustomer(string memory _customerName)
+        public
+        returns (bool)
+    {
+        require(
+            compareStringsbyBytes(
+                _customerName,
+                customers[_customerName].username
+            ),
+            "Customer doesn't exist. Use addCustomer to create new user"
+        );
+
+        require(
+            up_votes[_customerName][msg.sender] == 1,
+            "Customer hasn't been upvoted by you. use upVoteCustomer"
+        );
+
+        // update upVote count
+        customers[_customerName].upVotes--;
+        up_votes[_customerName][msg.sender] = 0;
+
+        emit RemoveUpVoteCustomer(_customerName, msg.sender);
         return true;
     }
 
@@ -252,21 +317,51 @@ contract KYC_Contract {
         );
 
         require(
-            down_votes[_customerName][msg.sender] != 0,
+            down_votes[_customerName][msg.sender] == 0,
             "Customer has already been down voted by you."
         );
 
-        // update upVote count
+        // update downVote count
         customers[_customerName].downVotes++;
         down_votes[_customerName][msg.sender] = 1;
 
-        emit DownVoteCustomer(_customerName);
+        emit DownVoteCustomer(_customerName, msg.sender);
+        return true;
+    }
+
+    /**
+     * Function to remove a down vote for a customer
+     * @param _customerName Name of the customer to be upvoted
+     * @return bool
+     */
+    function removeDownVoteCustomer(string memory _customerName)
+        public
+        returns (bool)
+    {
+        require(
+            compareStringsbyBytes(
+                _customerName,
+                customers[_customerName].username
+            ),
+            "Customer doesn't exist. Use addCustomer to create new user"
+        );
+
+        require(
+            down_votes[_customerName][msg.sender] == 1,
+            "Customer hasn't been down voted by you. Use downVoteCustomer."
+        );
+
+        // update downVote count
+        customers[_customerName].downVotes--;
+        down_votes[_customerName][msg.sender] = 0;
+
+        emit RemoveDownVoteCustomer(_customerName, msg.sender);
         return true;
     }
 
     // source: https://ethereum.stackexchange.com/questions/45813/compare-strings-in-solidity
     function compareStringsbyBytes(string memory s1, string memory s2)
-        public
+        private
         pure
         returns (bool)
     {
