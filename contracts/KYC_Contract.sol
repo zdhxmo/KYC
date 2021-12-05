@@ -17,6 +17,14 @@ contract KYC_Contract {
         _;
     }
 
+    modifier onlyApprovedBank() {
+        require(
+            added_banks[msg.sender] == true,
+            "Only approved banks are allowed to perform this operation"
+        );
+        _;
+    }
+
     struct Customer {
         string username;
         // hash that points to customer documents in secure storage
@@ -176,6 +184,7 @@ contract KYC_Contract {
      */
     function removeKYCRequest(string memory _customerName)
         public
+        onlyApprovedBank
         returns (bool)
     {
         // require that the username in fact exists as a KYC request
@@ -210,6 +219,7 @@ contract KYC_Contract {
     function viewCustomer(string memory _customerName)
         public
         view
+        onlyApprovedBank
         returns (
             string memory,
             string memory,
@@ -219,9 +229,11 @@ contract KYC_Contract {
         )
     {
         require(
-            customers[_customerName].validatorBankAddress ==
-                address(msg.sender),
-            "User doesn't exist on this database. Use addCustomer to create user"
+            compareStringsbyBytes(
+                _customerName,
+                customers[_customerName].username
+            ),
+            "Customer doesn't exist. Use addCustomer to create new user"
         );
 
         return (
@@ -242,7 +254,7 @@ contract KYC_Contract {
     function addCustomer(
         string memory _customerName,
         string memory _customerData
-    ) public returns (bool) {
+    ) public onlyApprovedBank returns (bool) {
         require(
             customers[_customerName].validatorBankAddress == address(0x0),
             "User exists. Please call modifyCustomer to make any changes"
@@ -268,11 +280,21 @@ contract KYC_Contract {
     function modifyCustomer(
         string memory _customerName,
         string memory _newCustomerData
-    ) public returns (bool) {
+    ) public onlyApprovedBank returns (bool) {
         require(
-            customers[_customerName].validatorBankAddress ==
-                address(msg.sender),
-            "User doesn't exist. Please call addCustomer to create new user"
+            compareStringsbyBytes(
+                _customerName,
+                customers[_customerName].username
+            ),
+            "Customer doesn't exist. Use addCustomer to create new user"
+        );
+
+        require(
+            !compareStringsbyBytes(
+                _newCustomerData,
+                customers[_customerName].customerData
+            ),
+            "This document already exists in the system."
         );
 
         customers[_customerName].customerData = _newCustomerData;
@@ -287,7 +309,7 @@ contract KYC_Contract {
      * @return bool true if KYC status was updated
      */
     function customerKYCStatus(string memory _customerName)
-        public
+        private
         returns (bool)
     {
         // solidity doesn't support float or rational numbers
@@ -322,7 +344,11 @@ contract KYC_Contract {
      * @param _customerName Name of the customer to be upvoted
      * @return bool confirmation that up votes were updated
      */
-    function upVoteCustomer(string memory _customerName) public returns (bool) {
+    function upVoteCustomer(string memory _customerName)
+        public
+        onlyApprovedBank
+        returns (bool)
+    {
         require(
             compareStringsbyBytes(
                 _customerName,
@@ -344,6 +370,11 @@ contract KYC_Contract {
             "Customer has already been upvoted by you."
         );
 
+        require(
+            down_votes[_customerName][msg.sender] == 1,
+            "Customer has down voted by you. Please remove down vote to place an up vote"
+        );
+
         // update upVote count
         customers[_customerName].upVotes++;
         up_votes[_customerName][msg.sender] = 1;
@@ -362,6 +393,7 @@ contract KYC_Contract {
      */
     function removeUpVoteCustomer(string memory _customerName)
         public
+        onlyApprovedBank
         returns (bool)
     {
         require(
@@ -403,6 +435,7 @@ contract KYC_Contract {
      */
     function downVoteCustomer(string memory _customerName)
         public
+        onlyApprovedBank
         returns (bool)
     {
         require(
@@ -426,6 +459,11 @@ contract KYC_Contract {
             "Customer has already been down voted by you."
         );
 
+        require(
+            up_votes[_customerName][msg.sender] == 1,
+            "Customer has upvoted by you. Please remove down vote to place an up vote"
+        );
+
         // update downVote count
         customers[_customerName].downVotes++;
         down_votes[_customerName][msg.sender] = 1;
@@ -444,6 +482,7 @@ contract KYC_Contract {
      */
     function removeDownVoteCustomer(string memory _customerName)
         public
+        onlyApprovedBank
         returns (bool)
     {
         require(
@@ -486,6 +525,7 @@ contract KYC_Contract {
     function getBankDetails(address _bankAddress)
         public
         view
+        onlyApprovedBank
         returns (
             string memory,
             address,
@@ -515,7 +555,11 @@ contract KYC_Contract {
      * @param _bankAddress Unique address of the bank
      * @return bool confirmation that report was submitted
      */
-    function reportBank(address _bankAddress) public returns (bool) {
+    function reportBank(address _bankAddress)
+        public
+        onlyApprovedBank
+        returns (bool)
+    {
         require(
             banks[_bankAddress].ethAddress == _bankAddress,
             "Bank address is incorrect. No such record exists"
@@ -548,6 +592,7 @@ contract KYC_Contract {
     function getBankComplaints(address _bankAddress)
         public
         view
+        onlyApprovedBank
         returns (uint32)
     {
         require(
