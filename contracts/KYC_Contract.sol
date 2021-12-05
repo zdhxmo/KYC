@@ -25,6 +25,14 @@ contract KYC_Contract {
         _;
     }
 
+    modifier bankAllowedToVote() {
+        require(
+            banks[msg.sender].isAllowedToVote == true,
+            "Your right to vote has been revoked. Please contact admin."
+        );
+        _;
+    }
+
     struct Customer {
         string username;
         // hash that points to customer documents in secure storage
@@ -224,6 +232,7 @@ contract KYC_Contract {
             string memory,
             string memory,
             address,
+            bool,
             uint32,
             uint32
         )
@@ -240,6 +249,7 @@ contract KYC_Contract {
             customers[_customerName].username,
             customers[_customerName].customerData,
             customers[_customerName].validatorBankAddress,
+            customers[_customerName].kycStatus,
             customers[_customerName].upVotes,
             customers[_customerName].downVotes
         );
@@ -347,6 +357,7 @@ contract KYC_Contract {
     function upVoteCustomer(string memory _customerName)
         public
         onlyApprovedBank
+        bankAllowedToVote
         returns (bool)
     {
         require(
@@ -371,7 +382,7 @@ contract KYC_Contract {
         );
 
         require(
-            down_votes[_customerName][msg.sender] == 1,
+            down_votes[_customerName][msg.sender] == 0,
             "Customer has down voted by you. Please remove down vote to place an up vote"
         );
 
@@ -394,6 +405,7 @@ contract KYC_Contract {
     function removeUpVoteCustomer(string memory _customerName)
         public
         onlyApprovedBank
+        bankAllowedToVote
         returns (bool)
     {
         require(
@@ -436,6 +448,7 @@ contract KYC_Contract {
     function downVoteCustomer(string memory _customerName)
         public
         onlyApprovedBank
+        bankAllowedToVote
         returns (bool)
     {
         require(
@@ -460,7 +473,7 @@ contract KYC_Contract {
         );
 
         require(
-            up_votes[_customerName][msg.sender] == 1,
+            up_votes[_customerName][msg.sender] == 0,
             "Customer has upvoted by you. Please remove down vote to place an up vote"
         );
 
@@ -483,6 +496,7 @@ contract KYC_Contract {
     function removeDownVoteCustomer(string memory _customerName)
         public
         onlyApprovedBank
+        bankAllowedToVote
         returns (bool)
     {
         require(
