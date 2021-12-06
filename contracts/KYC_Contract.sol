@@ -309,6 +309,9 @@ contract KYC_Contract {
 
         customers[_customerName].customerData = _newCustomerData;
 
+        // remove kyc request for non-existant customer details
+        removeKYCRequest(_customerName);
+
         emit ModifyCustomer(_customerName, _newCustomerData, msg.sender);
         return true;
     }
